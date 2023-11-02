@@ -23,14 +23,14 @@ Navigate to your project's git hooks directory. It is usually located in:
 cd your-project/.git/hooks/
 ```
 
-Create a symbolic link to the `commit-msg` hook from the cloned repository:
+Create a symbolic link to the `prepare-commit-msg` hook from the cloned repository:
 
 ```bash
-ln -s ~/.local/share/CommitGPT/commit-msg.sh commit-msg 
+ln -s ~/.local/share/CommitGPT/prepare-commit-msg.sh prepare-commit-msg 
 ```
 
 ```bash
-chmod +x commit-msg 
+chmod +x prepare-commit-msg 
 ```
 
 Configure the necessary environment variable `OPENAI_API_KEY` in your `.bashrc`, for example.
@@ -47,7 +47,7 @@ GIT_EDITOR=true git commit
 
 ## Configuring project goal
 
-This step is optional, but it is recommended to configure the project goal in the `commit-msg` hook. 
+This step is optional, but it is recommended to configure the project goal in the `prepare-commit-msg` hook. 
 This will help generate more elaborate reasons as to *why* the changes introduced by commit was made
 
 Navigate to the Repository:
