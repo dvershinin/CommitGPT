@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 COMMIT_FILE=$1
 
 # Collecting changes
