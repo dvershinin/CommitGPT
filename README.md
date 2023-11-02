@@ -58,8 +58,12 @@ Change directory into the repository where you want to configure the project goa
 Run the following command to set a custom prompt, for example:
 
 ```bash
-git config commit.goal "package new NGINX versions"
+git config commit.goal "assist in automating the process of generating commit messages"
 ```
+
+The goal should be a text you would otherwise place while filling int the blanks in the sentence:
+
+> The goal of the project is to ...
 
 ### Verifying the Configuration:
 
