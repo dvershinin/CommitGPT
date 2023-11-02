@@ -18,13 +18,16 @@ PROMPT="You are a smart git commit message creator software. Now you are going t
 PROMPT="$PROMPT\nFor the changes in:\n$CHANGES\nPlease create a commit message. Start with a one-sentence summary no longer than 72 characters, followed by two newline characters, then provide a detailed message."
 PROMPT="$PROMPT\nEnsure the detailed message is well-structured and each line does not exceed 72 characters."
 
+# Use jq to safely turn it into a JSON string
+JSON_ENCODED_PROMPT=$(jq -Rn --arg var "$PROMPT" '$var')
+
 # Sending request to OpenAI and getting the message
 MESSAGE_TEXT=$(curl -s -H "Content-Type: application/json" \
 -H "Authorization: Bearer $OPENAI_API_KEY" \
 -d @- https://api.openai.com/v1/chat/completions <<JSON | jq -r '.choices[0].message.content'
 {
     "model": "gpt-3.5-turbo",
-    "messages": [{"role": "system", "content": "$PROMPT"}],
+    "messages": [{"role": "system", "content": $JSON_ENCODED_PROMPT}],
     "max_tokens": 200
 }
 JSON
