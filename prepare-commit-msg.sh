@@ -1,44 +1,77 @@
 #!/bin/bash
 
 COMMIT_FILE=$1
+COMMIT_SOURCE=$2
 
-# Collecting changes
-CHANGES=$(git diff HEAD | sed 's/"/\\"/g') # Escaping double quotes
-
-# Reading the prompt from git config
-PROJECT_GOAL=$(git config --get commit.goal)
-
-# Setting a default prompt if none is configured
-if [ -z "$PROJECT_GOAL" ]; then
-    PROJECT_GOAL="develop new software"
+# Skip if commit message already provided (amend, merge, etc.)
+if [ -n "$COMMIT_SOURCE" ]; then
+    exit 0
 fi
 
+# Get staged changes (what will actually be committed)
+CHANGES=$(git diff --cached --stat)
+DIFF_CONTENT=$(git diff --cached | head -500)  # Limit diff size
 
-PROMPT="You are a smart git commit message creator software. Now you are going to create a git commit message for a project which has a goal to $PROJECT_GOAL. The commit messages you generate aim to explain why the changes were introduced."
-PROMPT="$PROMPT\nFor the changes in:\n$CHANGES\nPlease create a commit message. Start with a one-sentence summary no longer than 72 characters, followed by two newline characters, then provide a detailed message."
-PROMPT="$PROMPT\nEnsure the detailed message is well-structured and each line does not exceed 72 characters."
+# Skip if no changes
+if [ -z "$CHANGES" ]; then
+    echo "Auto-update" > "$COMMIT_FILE"
+    exit 0
+fi
 
-# Use jq to safely turn it into a JSON string
-JSON_ENCODED_PROMPT=$(jq -Rn --arg var "$PROMPT" '$var')
+# Check for API key
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "Auto-update" > "$COMMIT_FILE"
+    echo "" >> "$COMMIT_FILE"
+    echo "Changed files:" >> "$COMMIT_FILE"
+    echo "$CHANGES" >> "$COMMIT_FILE"
+    exit 0
+fi
 
-# Sending request to OpenAI and getting the message
-MESSAGE_TEXT=$(curl -s -H "Content-Type: application/json" \
+# Build a factual prompt
+read -r -d '' PROMPT << EOF
+Generate a git commit message for these changes. Be factual and concise.
+
+Files changed:
+$CHANGES
+
+Diff (truncated):
+$DIFF_CONTENT
+
+Rules:
+- First line: summary under 72 chars describing WHAT changed
+- Then blank line  
+- Then bullet points of specific changes
+- Do NOT invent features or reasons - only describe what the diff shows
+- If files were deleted, say they were deleted
+- If files were renamed, say they were renamed
+- If version numbers changed, mention the new version
+EOF
+
+# Call OpenAI API with timeout
+RESPONSE=$(timeout 30 curl -s -H "Content-Type: application/json" \
 -H "Authorization: Bearer $OPENAI_API_KEY" \
--d @- https://api.openai.com/v1/chat/completions <<JSON | jq -r '.choices[0].message.content'
+--data-binary @- https://api.openai.com/v1/chat/completions 2>/dev/null << JSONEOF
 {
-    "model": "gpt-3.5-turbo",
-    "messages": [{"role": "system", "content": $JSON_ENCODED_PROMPT}],
-    "max_tokens": 200
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": $(echo "$PROMPT" | jq -Rs .)}],
+    "max_tokens": 300,
+    "temperature": 0.3
 }
-JSON
+JSONEOF
 )
 
-# Extracting and formatting the summary and body
-SUMMARY=$(echo "$MESSAGE_TEXT" | head -n1)
-BODY=$(echo "$MESSAGE_TEXT" | sed '1d' | fold -s -w 72)
+# Extract message
+MESSAGE=$(echo "$RESPONSE" | jq -r ".choices[0].message.content // empty" 2>/dev/null)
 
+# Validate message - must not be null/empty/error
+if [ -z "$MESSAGE" ] || [ "$MESSAGE" = "null" ] || [[ "$MESSAGE" == *"error"* ]]; then
+    # Fallback to simple descriptive message
+    echo "Update files" > "$COMMIT_FILE"
+    echo "" >> "$COMMIT_FILE"
+    echo "Changed:" >> "$COMMIT_FILE"
+    echo "$CHANGES" >> "$COMMIT_FILE"
+    exit 0
+fi
 
-# Constructing the commit message
-echo "$SUMMARY" > "$COMMIT_FILE"
-echo "" >> "$COMMIT_FILE"
-echo "$BODY" >> "$COMMIT_FILE"
+# Write the commit message
+echo "$MESSAGE" > "$COMMIT_FILE"
