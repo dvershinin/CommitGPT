@@ -42,6 +42,8 @@ Rules:
 - Then blank line  
 - Then bullet points of specific changes
 - Do NOT invent features or reasons - only describe what the diff shows
+- Do NOT wrap the message in markdown code fences or backticks
+- Output ONLY the raw commit message text, nothing else
 - If files were deleted, say they were deleted
 - If files were renamed, say they were renamed
 - If version numbers changed, mention the new version
@@ -72,6 +74,12 @@ if [ -z "$MESSAGE" ] || [ "$MESSAGE" = "null" ] || [[ "$MESSAGE" == *"error"* ]]
     echo "$CHANGES" >> "$COMMIT_FILE"
     exit 0
 fi
+
+# Strip markdown code fences (```markdown, ```, etc.) that GPT sometimes adds
+MESSAGE=$(echo "$MESSAGE" | sed '/^```/d')
+
+# Strip leading/trailing blank lines
+MESSAGE=$(echo "$MESSAGE" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba;}')
 
 # Write the commit message
 echo "$MESSAGE" > "$COMMIT_FILE"
