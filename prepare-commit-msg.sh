@@ -60,6 +60,18 @@ Rules:
 - If version numbers changed, mention the new version
 EOF
 
+# gpt-5* family rejects max_tokens (wants max_completion_tokens), refuses
+# any temperature other than 1, and silently spends the entire token budget
+# on internal reasoning unless reasoning_effort is pinned low. Older chat
+# models (gpt-4.1*, gpt-4o*, etc.) keep the original parameters.
+if [[ "$MODEL" == gpt-5* ]]; then
+    TOKENS_KEY="max_completion_tokens"
+    EXTRA_PARAMS=',"reasoning_effort":"minimal"'
+else
+    TOKENS_KEY="max_tokens"
+    EXTRA_PARAMS=',"temperature":0.3'
+fi
+
 # Call OpenAI API with timeout
 RESPONSE=$(timeout 30 curl -s -H "Content-Type: application/json" \
 -H "Authorization: Bearer $API_KEY" \
@@ -67,8 +79,8 @@ RESPONSE=$(timeout 30 curl -s -H "Content-Type: application/json" \
 {
     "model": "$MODEL",
     "messages": [{"role": "user", "content": $(echo "$PROMPT" | jq -Rs .)}],
-    "max_tokens": 300,
-    "temperature": 0.3
+    "$TOKENS_KEY": 300
+    $EXTRA_PARAMS
 }
 JSONEOF
 )
