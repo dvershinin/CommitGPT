@@ -8,6 +8,17 @@ if [ -n "$COMMIT_SOURCE" ]; then
     exit 0
 fi
 
+# Allow callers to isolate this hook's OpenAI spend from any other OPENAI_API_KEY
+# already in the environment (e.g. when the same shell runs other AI tooling
+# against a personal key). Falls back to OPENAI_API_KEY when COMMITGPT_OPENAI_API_KEY
+# is unset so existing setups keep working unchanged.
+API_KEY="${COMMITGPT_OPENAI_API_KEY:-$OPENAI_API_KEY}"
+
+# Model is overridable too. Default to the cheapest current-generation tier
+# ($0.05/M input, $0.40/M output at the time of writing). Anything in the
+# OpenAI Chat Completions catalogue works.
+MODEL="${COMMITGPT_MODEL:-gpt-5-nano}"
+
 # Get staged changes (what will actually be committed)
 CHANGES=$(git diff --cached --stat)
 DIFF_CONTENT=$(git diff --cached | head -500)  # Limit diff size
@@ -19,7 +30,7 @@ if [ -z "$CHANGES" ]; then
 fi
 
 # Check for API key
-if [ -z "$OPENAI_API_KEY" ]; then
+if [ -z "$API_KEY" ]; then
     echo "Auto-update" > "$COMMIT_FILE"
     echo "" >> "$COMMIT_FILE"
     echo "Changed files:" >> "$COMMIT_FILE"
@@ -51,10 +62,10 @@ EOF
 
 # Call OpenAI API with timeout
 RESPONSE=$(timeout 30 curl -s -H "Content-Type: application/json" \
--H "Authorization: Bearer $OPENAI_API_KEY" \
+-H "Authorization: Bearer $API_KEY" \
 --data-binary @- https://api.openai.com/v1/chat/completions 2>/dev/null << JSONEOF
 {
-    "model": "gpt-4o-mini",
+    "model": "$MODEL",
     "messages": [{"role": "user", "content": $(echo "$PROMPT" | jq -Rs .)}],
     "max_tokens": 300,
     "temperature": 0.3

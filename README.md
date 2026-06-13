@@ -35,6 +35,14 @@ chmod +x prepare-commit-msg
 
 Configure the necessary environment variable `OPENAI_API_KEY` in your `.bashrc`, for example.
 
+### Optional environment variables
+
+- `COMMITGPT_OPENAI_API_KEY` — when set, used instead of `OPENAI_API_KEY` so this
+  hook's spend can be isolated from any other AI tooling sharing the shell.
+- `COMMITGPT_MODEL` — overrides the model name. Defaults to `gpt-5-nano`
+  (cheapest current-generation tier). Any model that accepts Chat Completions
+  works: `gpt-4.1-nano`, `gpt-4o-mini`, etc.
+
 ## Usage
 
 Once installed, the hook will automatically run when you execute git commit in your project repository.
